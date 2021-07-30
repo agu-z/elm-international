@@ -1,0 +1,23 @@
+{
+  "name": "@agu-z/elm-international",
+  "version": "1.0.0",
+  "description": "Internationalization API for Elm",
+  "private": "true",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/agu-z/elm-international.git"
+  },
+  "author": "Agus Zubiaga <hi@aguz.me>",
+  "license": "BSD-3-Clause",
+  "bugs": {
+    "url": "https://github.com/agu-z/elm-international/issues"
+  },
+  "homepage": "https://github.com/agu-z/elm-international#readme",
+  "dependencies": {
+    "elm": "^0.19.1-5",
+    "elm-format": "^0.8.5",
+    "elm-review": "^2.5.3",
+    "elm-test": "^0.19.1-revision7"
+  }
+}
