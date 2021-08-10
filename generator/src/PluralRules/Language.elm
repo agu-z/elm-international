@@ -1,7 +1,8 @@
-module PluralRule exposing
+module PluralRules.Language exposing
     ( AndCondition(..)
     , Condition(..)
     , Expression(..)
+    , FractionTrailingZeroes(..)
     , IsFinite(..)
     , Operand(..)
     , Range(..)
@@ -119,27 +120,38 @@ expression =
 
 
 type Operand
-    = N
-    | I
-    | V
-    | W
-    | F
-    | T
-    | C
-    | E
+    = Absolute
+    | Whole
+    | Fraction FractionTrailingZeroes
+    | FractionCount FractionTrailingZeroes
+    | DecimalExponent
+
+
+type FractionTrailingZeroes
+    = WithTrailingZeroes
+    | WithoutTrailingZeroes
 
 
 operand : Parser Operand
 operand =
     oneOf
-        [ succeed N |. symbol "n"
-        , succeed I |. symbol "i"
-        , succeed V |. symbol "v"
-        , succeed W |. symbol "w"
-        , succeed F |. symbol "f"
-        , succeed T |. symbol "t"
-        , succeed C |. symbol "c"
-        , succeed E |. symbol "e"
+        [ succeed Absolute
+            |. symbol "n"
+        , succeed Whole
+            |. symbol "i"
+        , succeed (FractionCount WithTrailingZeroes)
+            |. symbol "v"
+        , succeed (FractionCount WithoutTrailingZeroes)
+            |. symbol "w"
+        , succeed (Fraction WithTrailingZeroes)
+            |. symbol "f"
+        , succeed (Fraction WithoutTrailingZeroes)
+            |. symbol "t"
+        , succeed DecimalExponent
+            |. oneOf
+                [ symbol "c"
+                , symbol "e"
+                ]
         ]
 
 
