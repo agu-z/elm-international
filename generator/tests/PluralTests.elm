@@ -3,7 +3,7 @@ module PluralTests exposing (suite)
 import Expect
 import Fuzz exposing (Fuzzer)
 import Parser
-import PluralRule as R
+import PluralRules.Language as R
 import Test exposing (Test)
 
 
@@ -159,14 +159,14 @@ expression =
 
 operand : SyntaxFuzzer R.Operand
 operand =
-    [ ( "n", R.N )
-    , ( "i", R.I )
-    , ( "v", R.V )
-    , ( "w", R.W )
-    , ( "f", R.F )
-    , ( "t", R.T )
-    , ( "c", R.C )
-    , ( "e", R.E )
+    [ ( "n", R.Absolute )
+    , ( "i", R.Whole )
+    , ( "v", R.FractionCount R.WithTrailingZeroes )
+    , ( "w", R.FractionCount R.WithoutTrailingZeroes )
+    , ( "f", R.Fraction R.WithTrailingZeroes )
+    , ( "t", R.Fraction R.WithoutTrailingZeroes )
+    , ( "c", R.DecimalExponent )
+    , ( "e", R.DecimalExponent )
     ]
         |> List.map Fuzz.constant
         |> Fuzz.oneOf
