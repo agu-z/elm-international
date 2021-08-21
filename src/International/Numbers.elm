@@ -9,7 +9,9 @@ module International.Numbers exposing
     , int
     , padLeft
     , prefix
+    , sign
     , suffix
+    , text
     , toString
     )
 
@@ -27,11 +29,26 @@ type Format
     = Format
         { system : NumberingSystem
         , symbols : Symbols
-        , prefix : String
-        , suffix : String
+        , prefix : List Sorrounding
+        , suffix : List Sorrounding
         , intPadding : Int
         , intGrouping : Grouping
         }
+
+
+type Sorrounding
+    = Text String
+    | Sign
+
+
+text : String -> Sorrounding
+text =
+    Text
+
+
+sign : Sorrounding
+sign =
+    Sign
 
 
 type NumberingSystem
@@ -60,8 +77,8 @@ createFormat symbols system =
     Format
         { system = system
         , symbols = symbols
-        , prefix = ""
-        , suffix = ""
+        , prefix = []
+        , suffix = []
         , intPadding = 0
         , intGrouping = DoNotGroup
         }
@@ -82,14 +99,14 @@ groupWith mostSignificant leastSignificant (Format f) =
     Format { f | intGrouping = GroupWith mostSignificant leastSignificant }
 
 
-prefix : String -> Format -> Format
-prefix str (Format f) =
-    Format { f | prefix = str }
+prefix : List Sorrounding -> Format -> Format
+prefix value (Format f) =
+    Format { f | prefix = value }
 
 
-suffix : String -> Format -> Format
-suffix str (Format f) =
-    Format { f | suffix = str }
+suffix : List Sorrounding -> Format -> Format
+suffix value (Format f) =
+    Format { f | suffix = value }
 
 
 type Number
@@ -112,7 +129,7 @@ toString (Number value wrappedFormat) =
 
         str : String
         str =
-            numericToString digits value ""
+            numericToString digits (abs value) ""
 
         padCount : Int
         padCount =
@@ -139,8 +156,30 @@ toString (Number value wrappedFormat) =
 
                 DoNotGroup ->
                     padded
+
+        sorroundingToString : List Sorrounding -> String
+        sorroundingToString =
+            List.map
+                (\sorrounding ->
+                    case sorrounding of
+                        Text literal ->
+                            literal
+
+                        Sign ->
+                            if value < 0 then
+                                symbols.minusSign
+
+                            else if value > 0 then
+                                symbols.plusSign
+
+                            else
+                                ""
+                )
+                >> String.join ""
     in
-    format.prefix ++ grouped ++ format.suffix
+    sorroundingToString format.prefix
+        ++ grouped
+        ++ sorroundingToString format.suffix
 
 
 groupHelp : Int -> String -> String -> String -> String
