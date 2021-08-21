@@ -86,6 +86,23 @@ suite =
                         |> Numbers.int 1234567
                         |> expectFormat "1234567"
             ]
+        , describe "sorrounding"
+            [ test "adds literal prefix before everything else" <|
+                \_ ->
+                    format
+                        |> Numbers.prefix "#"
+                        |> Numbers.padLeft 6
+                        |> Numbers.groupEach 3
+                        |> Numbers.int 1234
+                        |> expectFormat "#001,234"
+            , test "adds literal suffix after everything else" <|
+                \_ ->
+                    format
+                        |> Numbers.groupEach 3
+                        |> Numbers.suffix "!"
+                        |> Numbers.int 1234
+                        |> expectFormat "1,234!"
+            ]
         ]
 
 
