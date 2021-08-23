@@ -1,8 +1,9 @@
 module NumberTests exposing (suite)
 
 import Expect
+import Fuzz
 import International.Numbers as Numbers
-import Test exposing (Test, describe, only, test)
+import Test exposing (Test, describe, fuzz, only, test)
 
 
 suite : Test
@@ -114,12 +115,67 @@ suite =
                         |> Numbers.suffix [ Numbers.text " ", Numbers.sign ]
                         |> Numbers.int 1234
                         |> expectFormat "1234 +"
-            , test "negative sign" <|
+            , test "negative sign default behavior" <|
                 \_ ->
                     format
-                        |> Numbers.prefix [ Numbers.sign ]
+                        |> Numbers.prefix [ Numbers.text "$" ]
                         |> Numbers.int -1234
-                        |> expectFormat "-1234"
+                        |> expectFormat "$-1234"
+            , test "negative sign default behavior with general prefix" <|
+                \_ ->
+                    format
+                        |> Numbers.prefix [ Numbers.sign, Numbers.text " $" ]
+                        |> Numbers.int -1234
+                        |> expectFormat "- $1234"
+            , test "custom negative sorrounding" <|
+                \_ ->
+                    format
+                        |> Numbers.groupEach 3
+                        |> Numbers.sorroundNegativeWith [ Numbers.text "($" ] [ Numbers.text ")" ]
+                        |> Numbers.int -1234
+                        |> expectFormat "($1,234)"
+            ]
+        , describe "decimals"
+            [ test "discards trailing zeros after minimum places" <|
+                \_ ->
+                    format
+                        |> Numbers.decimalPlaces { min = 2, max = 5 }
+                        |> Numbers.float 123.456
+                        |> expectFormat "123.456"
+            , test "keeps leading zeroes as long as they fit max places" <|
+                \_ ->
+                    format
+                        |> Numbers.decimalPlaces { min = 2, max = 5 }
+                        |> Numbers.float 123.001
+                        |> expectFormat "123.001"
+            , test "drops fraction if it's .0 and min places = 0" <|
+                \_ ->
+                    format
+                        |> Numbers.decimalPlaces { min = 0, max = 2 }
+                        |> Numbers.float 123.003
+                        |> expectFormat "123"
+            , test "adds trailing zeroes to match min places" <|
+                \_ ->
+                    format
+                        |> Numbers.decimalPlaces { min = 3, max = 5 }
+                        |> Numbers.float 123.3
+                        |> expectFormat "123.300"
+            ]
+        , describe "decimal grouping"
+            [ test "groupDecimalsEach" <|
+                \_ ->
+                    format
+                        |> Numbers.exactDecimalPlaces 6
+                        |> Numbers.groupDecimalsEach 3
+                        |> Numbers.float 12
+                        |> expectFormat "12.000,000"
+            , test "groupDecimalsWith" <|
+                \_ ->
+                    format
+                        |> Numbers.exactDecimalPlaces 8
+                        |> Numbers.groupDecimalsWith 2 3
+                        |> Numbers.float 12
+                        |> expectFormat "12.0,00,00,000"
             ]
         ]
 

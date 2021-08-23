@@ -4,19 +4,25 @@ module International.Numbers exposing
     , NumberingSystem(..)
     , Symbols
     , createFormat
+    , decimalPlaces
+    , defaultNegativeSorrounding
+    , exactDecimalPlaces
+    , float
+    , groupDecimalsEach
+    , groupDecimalsWith
     , groupEach
     , groupWith
     , int
     , padLeft
     , prefix
     , sign
+    , sorroundNegativeWith
     , suffix
     , text
     , toString
     )
 
 import Dict exposing (Dict)
-import String.Extra as String
 
 
 type Grouping
@@ -33,7 +39,16 @@ type Format
         , suffix : List Sorrounding
         , intPadding : Int
         , intGrouping : Grouping
+        , negativeSorrounding : NegativeSorrounding
+        , minDecimalPlaces : Int
+        , maxDecimalPlaces : Int
+        , decimalGrouping : Grouping
         }
+
+
+type NegativeSorrounding
+    = DefaultNegativeSorrounding
+    | CustomNegativeSorrounding (List Sorrounding) (List Sorrounding)
 
 
 type Sorrounding
@@ -81,6 +96,10 @@ createFormat symbols system =
         , suffix = []
         , intPadding = 0
         , intGrouping = DoNotGroup
+        , negativeSorrounding = DefaultNegativeSorrounding
+        , minDecimalPlaces = 0
+        , maxDecimalPlaces = 3
+        , decimalGrouping = DoNotGroup
         }
 
 
@@ -99,6 +118,16 @@ groupWith mostSignificant leastSignificant (Format f) =
     Format { f | intGrouping = GroupWith mostSignificant leastSignificant }
 
 
+groupDecimalsEach : Int -> Format -> Format
+groupDecimalsEach size (Format f) =
+    Format { f | decimalGrouping = GroupEach size }
+
+
+groupDecimalsWith : Int -> Int -> Format -> Format
+groupDecimalsWith mostSignificant leastSignificant (Format f) =
+    Format { f | decimalGrouping = GroupWith mostSignificant leastSignificant }
+
+
 prefix : List Sorrounding -> Format -> Format
 prefix value (Format f) =
     Format { f | prefix = value }
@@ -109,53 +138,84 @@ suffix value (Format f) =
     Format { f | suffix = value }
 
 
+defaultNegativeSorrounding : Format -> Format
+defaultNegativeSorrounding (Format f) =
+    Format { f | negativeSorrounding = DefaultNegativeSorrounding }
+
+
+sorroundNegativeWith : List Sorrounding -> List Sorrounding -> Format -> Format
+sorroundNegativeWith prefixes suffixes (Format f) =
+    Format { f | negativeSorrounding = CustomNegativeSorrounding prefixes suffixes }
+
+
+decimalPlaces : { min : Int, max : Int } -> Format -> Format
+decimalPlaces { min, max } (Format f) =
+    Format { f | minDecimalPlaces = min, maxDecimalPlaces = max }
+
+
+exactDecimalPlaces : Int -> Format -> Format
+exactDecimalPlaces places =
+    decimalPlaces { min = places, max = places }
+
+
 type Number
-    = Number Int Format
+    = Number Float Format
 
 
 int : Int -> Format -> Number
 int =
+    toFloat >> Number
+
+
+float : Float -> Format -> Number
+float =
     Number
 
 
 toString : Number -> String
 toString (Number value wrappedFormat) =
     let
-        (Format ({ symbols, system, intPadding, intGrouping } as format)) =
+        (Format ({ symbols, system, intPadding, intGrouping, decimalGrouping, minDecimalPlaces, maxDecimalPlaces } as format)) =
             wrappedFormat
 
         (Numeric digits) =
             system
 
-        str : String
-        str =
-            numericToString digits (abs value) ""
+        absolute : Float
+        absolute =
+            abs value
 
-        padCount : Int
-        padCount =
-            intPadding - String.length str
+        zero : Char
+        zero =
+            String.uncons digits
+                |> Maybe.map Tuple.first
+                |> Maybe.withDefault '0'
 
-        padded : String
-        padded =
-            String.repeat padCount (getDigit 0 digits) ++ str
+        formattedInt : String
+        formattedInt =
+            absolute
+                |> intToString digits
+                |> String.padLeft intPadding zero
+                |> group symbols intGrouping
 
-        grouped : String
-        grouped =
-            case intGrouping of
-                GroupEach size ->
-                    groupHelp size symbols.group padded ""
+        fractionWithSeparator : String
+        fractionWithSeparator =
+            let
+                formattedFraction : String
+                formattedFraction =
+                    absolute
+                        |> decimalToString digits minDecimalPlaces maxDecimalPlaces
+                        |> group symbols decimalGrouping
+            in
+            if formattedFraction == "" then
+                ""
 
-                GroupWith mostSignificant leastSignificant ->
-                    if String.length padded > leastSignificant then
-                        groupHelp mostSignificant symbols.group (String.dropRight leastSignificant padded) ""
-                            ++ symbols.group
-                            ++ String.right leastSignificant padded
+            else
+                symbols.decimal ++ formattedFraction
 
-                    else
-                        groupHelp leastSignificant symbols.group padded ""
-
-                DoNotGroup ->
-                    padded
+        strNumber : String
+        strNumber =
+            formattedInt ++ fractionWithSeparator
 
         sorroundingToString : List Sorrounding -> String
         sorroundingToString =
@@ -177,9 +237,54 @@ toString (Number value wrappedFormat) =
                 )
                 >> String.join ""
     in
-    sorroundingToString format.prefix
-        ++ grouped
-        ++ sorroundingToString format.suffix
+    if value >= 0 then
+        sorroundingToString format.prefix
+            ++ strNumber
+            ++ sorroundingToString format.suffix
+
+    else
+        case format.negativeSorrounding of
+            DefaultNegativeSorrounding ->
+                sorroundingToString format.prefix
+                    ++ (if List.member Sign format.prefix || List.member Sign format.suffix then
+                            ""
+
+                        else
+                            "-"
+                       )
+                    ++ strNumber
+                    ++ sorroundingToString format.suffix
+
+            CustomNegativeSorrounding p s ->
+                sorroundingToString p ++ strNumber ++ sorroundingToString s
+
+
+dropRightChar : Char -> String -> String
+dropRightChar charToDrop str =
+    if String.right 1 str == String.fromChar charToDrop then
+        dropRightChar charToDrop (String.dropRight 1 str)
+
+    else
+        str
+
+
+group : Symbols -> Grouping -> String -> String
+group symbols grouping input =
+    case grouping of
+        DoNotGroup ->
+            input
+
+        GroupEach size ->
+            groupHelp size symbols.group input ""
+
+        GroupWith mostSignificant leastSignificant ->
+            if String.length input > leastSignificant then
+                groupHelp mostSignificant symbols.group (String.dropRight leastSignificant input) ""
+                    ++ symbols.group
+                    ++ String.right leastSignificant input
+
+            else
+                groupHelp leastSignificant symbols.group input ""
 
 
 groupHelp : Int -> String -> String -> String -> String
@@ -197,16 +302,66 @@ groupHelp groupSize symbol pending done =
         pending ++ done
 
 
-numericToString : String -> Int -> String -> String
-numericToString digits value done =
-    if value < 10 then
-        getDigit value digits ++ done
+intToString : String -> Float -> String
+intToString =
+    intToStringHelp ""
+
+
+intToStringHelp : String -> String -> Float -> String
+intToStringHelp done digits value =
+    -- This function uses Floats because Elm's (//) converts numbers to 32-bit ints.
+    -- If we used Ints, some valid numbers would overflow during formatting.
+    -- https://github.com/elm/core/issues/92
+    if value < 10.0 then
+        getDigit (floor value) digits ++ done
 
     else
-        numericToString
-            digits
-            (value // 10)
-            (getDigit (remainderBy 10 value) digits ++ done)
+        let
+            next : Float
+            next =
+                value / 10
+
+            digit : String
+            digit =
+                getDigit (modBy 10 (floor value)) digits
+        in
+        intToStringHelp (digit ++ done) digits next
+
+
+decimalToString : String -> Int -> Int -> Float -> String
+decimalToString digits min max value =
+    decimalToStringHelp "" digits min max value
+
+
+decimalToStringHelp : String -> String -> Int -> Int -> Float -> String
+decimalToStringHelp done digits min max value =
+    if String.length done == max then
+        dropRightChar (getZero digits) done
+
+    else if value == toFloat (floor value) then
+        String.padRight min (getZero digits) done
+
+    else
+        let
+            next : Float
+            next =
+                value * 10
+
+            digit : String
+            digit =
+                getDigit (modBy 10 (floor next)) digits
+        in
+        decimalToStringHelp (done ++ digit) digits min max next
+
+
+getZero : String -> Char
+getZero digits =
+    case String.uncons digits of
+        Just ( x, _ ) ->
+            x
+
+        _ ->
+            '0'
 
 
 getDigit : Int -> String -> String
