@@ -1,5 +1,6 @@
 module International.Numbers exposing
-    ( Format
+    ( Digits
+    , Format
     , Number
     , NumberingSystem(..)
     , Symbols
@@ -13,6 +14,7 @@ module International.Numbers exposing
     , groupEach
     , groupWith
     , int
+    , latinSystem
     , padLeft
     , prefix
     , sign
@@ -67,7 +69,21 @@ sign =
 
 
 type NumberingSystem
-    = Numeric String
+    = Numeric Digits
+
+
+type alias Digits =
+    { n0 : String
+    , n1 : String
+    , n2 : String
+    , n3 : String
+    , n4 : String
+    , n5 : String
+    , n6 : String
+    , n7 : String
+    , n8 : String
+    , n9 : String
+    }
 
 
 type alias Symbols =
@@ -181,20 +197,17 @@ toString (Number value wrappedFormat) =
         (Numeric digits) =
             system
 
-        absolute : Float
-        absolute =
-            abs value
+        ( whole, fraction ) =
+            numberParts (abs value)
 
         zero : Char
         zero =
-            String.uncons digits
-                |> Maybe.map Tuple.first
-                |> Maybe.withDefault '0'
+            digits.n0 |> String.uncons |> Maybe.map Tuple.first |> Maybe.withDefault ' '
 
         formattedInt : String
         formattedInt =
-            absolute
-                |> intToString digits
+            whole
+                |> replaceDigits digits
                 |> String.padLeft intPadding zero
                 |> group symbols intGrouping
 
@@ -203,15 +216,18 @@ toString (Number value wrappedFormat) =
             let
                 formattedFraction : String
                 formattedFraction =
-                    absolute
-                        |> decimalToString digits minDecimalPlaces maxDecimalPlaces
+                    fraction
+                        |> replaceDigits digits
+                        |> String.slice 0 maxDecimalPlaces
+                        |> dropRightChar zero
+                        |> String.padRight minDecimalPlaces zero
                         |> group symbols decimalGrouping
             in
-            if formattedFraction == "" then
+            if String.isEmpty formattedFraction then
                 ""
 
             else
-                symbols.decimal ++ formattedFraction
+                "." ++ formattedFraction
 
         strNumber : String
         strNumber =
@@ -259,6 +275,84 @@ toString (Number value wrappedFormat) =
                 sorroundingToString p ++ strNumber ++ sorroundingToString s
 
 
+numberParts : Float -> ( String, String )
+numberParts value =
+    case String.fromFloat value |> String.split "." of
+        [ whole ] ->
+            ( whole, "" )
+
+        [ whole, fraction ] ->
+            ( whole, fraction )
+
+        _ ->
+            ( "", "" )
+
+
+latinDigits : Digits
+latinDigits =
+    Digits "0" "1" "2" "3" "4" "5" "6" "7" "8" "9"
+
+
+latinSystem : NumberingSystem
+latinSystem =
+    Numeric latinDigits
+
+
+replaceDigits : Digits -> String -> String
+replaceDigits digits =
+    if digits == latinDigits then
+        identity
+
+    else
+        replaceDigitsHelp digits ""
+
+
+replaceDigitsHelp : Digits -> String -> String -> String
+replaceDigitsHelp digits done num =
+    if String.isEmpty num then
+        done
+
+    else
+        let
+            digit : String
+            digit =
+                case String.left 1 num of
+                    "0" ->
+                        digits.n0
+
+                    "1" ->
+                        digits.n1
+
+                    "2" ->
+                        digits.n2
+
+                    "3" ->
+                        digits.n3
+
+                    "4" ->
+                        digits.n4
+
+                    "5" ->
+                        digits.n5
+
+                    "6" ->
+                        digits.n6
+
+                    "7" ->
+                        digits.n7
+
+                    "8" ->
+                        digits.n8
+
+                    "9" ->
+                        digits.n9
+
+                    s ->
+                        s
+        in
+        replaceDigitsHelp digits (done ++ digit) (String.dropLeft 1 num)
+
+
 dropRightChar : Char -> String -> String
 dropRightChar charToDrop str =
     if String.right 1 str == String.fromChar charToDrop then
@@ -300,58 +394,6 @@ groupHelp groupSize symbol pending done =
 
     else
         pending ++ done
-
-
-intToString : String -> Float -> String
-intToString =
-    intToStringHelp ""
-
-
-intToStringHelp : String -> String -> Float -> String
-intToStringHelp done digits value =
-    -- This function uses Floats because Elm's (//) converts numbers to 32-bit ints.
-    -- If we used Ints, some valid numbers would overflow during formatting.
-    -- https://github.com/elm/core/issues/92
-    if value < 10.0 then
-        getDigit (floor value) digits ++ done
-
-    else
-        let
-            next : Float
-            next =
-                value / 10
-
-            digit : String
-            digit =
-                getDigit (modBy 10 (floor value)) digits
-        in
-        intToStringHelp (digit ++ done) digits next
-
-
-decimalToString : String -> Int -> Int -> Float -> String
-decimalToString digits min max value =
-    decimalToStringHelp "" digits min max value
-
-
-decimalToStringHelp : String -> String -> Int -> Int -> Float -> String
-decimalToStringHelp done digits min max value =
-    if String.length done == max then
-        dropRightChar (getZero digits) done
-
-    else if value == toFloat (floor value) then
-        String.padRight min (getZero digits) done
-
-    else
-        let
-            next : Float
-            next =
-                value * 10
-
-            digit : String
-            digit =
-                getDigit (modBy 10 (floor next)) digits
-        in
-        decimalToStringHelp (done ++ digit) digits min max next
 
 
 getZero : String -> Char

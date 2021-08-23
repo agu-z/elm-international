@@ -24,7 +24,7 @@ suite =
                         |> expectFormat "4200"
             , test "uses numbering systems digit for 0 instead of hardcoded '0'" <|
                 \_ ->
-                    Numbers.createFormat symbols (Numbers.Numeric "Z123456789")
+                    Numbers.createFormat symbols (Numbers.Numeric <| Numbers.Digits "Z" "1" "2" "3" "4" "5" "6" "7" "8" "9")
                         |> Numbers.padLeft 3
                         |> Numbers.int 1
                         |> Numbers.toString
@@ -64,7 +64,7 @@ suite =
                         |> expectFormat "000,001,234"
             , test "uses specified grouping symbol" <|
                 \_ ->
-                    Numbers.createFormat { symbols | group = "." } latn
+                    Numbers.createFormat { symbols | group = "." } Numbers.latinSystem
                         |> Numbers.groupEach 3
                         |> Numbers.int 1234
                         |> expectFormat "1.234"
@@ -160,6 +160,12 @@ suite =
                         |> Numbers.decimalPlaces { min = 3, max = 5 }
                         |> Numbers.float 123.3
                         |> expectFormat "123.300"
+            , fuzz Fuzz.float "can format like String.fromFloat" <|
+                \value ->
+                    format
+                        |> Numbers.decimalPlaces { min = 0, max = 21 }
+                        |> Numbers.float value
+                        |> expectFormat (String.fromFloat value)
             ]
         , describe "decimal grouping"
             [ test "groupDecimalsEach" <|
@@ -177,6 +183,13 @@ suite =
                         |> Numbers.float 12
                         |> expectFormat "12.0,00,00,000"
             ]
+        , test "custom system" <|
+            \_ ->
+                Numbers.createFormat symbols (Numbers.Numeric <| Numbers.Digits "A" "B" "C" "D" "E" "F" "G" "H" "I" "J")
+                    |> Numbers.exactDecimalPlaces 3
+                    |> Numbers.padLeft 12
+                    |> Numbers.float 123456789.01
+                    |> expectFormat "AAABCDEFGHIJ.ABA"
         ]
 
 
@@ -187,12 +200,7 @@ expectFormat expected =
 
 format : Numbers.Format
 format =
-    Numbers.createFormat symbols latn
-
-
-latn : Numbers.NumberingSystem
-latn =
-    Numbers.Numeric "0123456789"
+    Numbers.createFormat symbols Numbers.latinSystem
 
 
 symbols : Numbers.Symbols
