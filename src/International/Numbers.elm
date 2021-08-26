@@ -394,18 +394,3 @@ groupHelp groupSize symbol pending done =
 
     else
         pending ++ done
-
-
-getZero : String -> Char
-getZero digits =
-    case String.uncons digits of
-        Just ( x, _ ) ->
-            x
-
-        _ ->
-            '0'
-
-
-getDigit : Int -> String -> String
-getDigit index =
-    String.slice index (index + 1)
