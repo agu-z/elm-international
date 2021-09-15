@@ -24,8 +24,6 @@ module International.Numbers exposing
     , toString
     )
 
-import Dict exposing (Dict)
-
 
 type Grouping
     = DoNotGroup
