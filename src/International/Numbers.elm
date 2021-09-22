@@ -15,6 +15,7 @@ module International.Numbers exposing
     , groupWith
     , int
     , latinSystem
+    , maxIntDigits
     , padLeft
     , prefix
     , sign
@@ -37,7 +38,8 @@ type Format
         , symbols : Symbols
         , prefix : List Sorrounding
         , suffix : List Sorrounding
-        , intPadding : Int
+        , minIntDigits : Int
+        , maxIntDigits : Maybe Int
         , intGrouping : Grouping
         , negativeSorrounding : NegativeSorrounding
         , minDecimalPlaces : Int
@@ -108,7 +110,8 @@ createFormat symbols system =
         , symbols = symbols
         , prefix = []
         , suffix = []
-        , intPadding = 0
+        , minIntDigits = 1
+        , maxIntDigits = Nothing
         , intGrouping = DoNotGroup
         , negativeSorrounding = DefaultNegativeSorrounding
         , minDecimalPlaces = 0
@@ -119,7 +122,12 @@ createFormat symbols system =
 
 padLeft : Int -> Format -> Format
 padLeft padding (Format f) =
-    Format { f | intPadding = padding }
+    Format { f | minIntDigits = padding }
+
+
+maxIntDigits : Int -> Format -> Format
+maxIntDigits max (Format f) =
+    Format { f | maxIntDigits = Just max }
 
 
 groupEach : Int -> Format -> Format
@@ -189,7 +197,7 @@ float =
 toString : Number -> String
 toString (Number value wrappedFormat) =
     let
-        (Format ({ symbols, system, intPadding, intGrouping, decimalGrouping, minDecimalPlaces, maxDecimalPlaces } as format)) =
+        (Format ({ symbols, system, minIntDigits, intGrouping, decimalGrouping, minDecimalPlaces, maxDecimalPlaces } as format)) =
             wrappedFormat
 
         (Numeric digits) =
@@ -206,7 +214,14 @@ toString (Number value wrappedFormat) =
         formattedInt =
             whole
                 |> replaceDigits digits
-                |> String.padLeft intPadding zero
+                |> (case format.maxIntDigits of
+                        Just max ->
+                            String.right max
+
+                        Nothing ->
+                            identity
+                   )
+                |> String.padLeft minIntDigits zero
                 |> group symbols intGrouping
 
         fractionWithSeparator : String

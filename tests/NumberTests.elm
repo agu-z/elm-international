@@ -30,6 +30,20 @@ suite =
                         |> Numbers.toString
                         |> Expect.equal "ZZ1"
             ]
+        , describe "maxIntDigits"
+            [ test "takes from the right" <|
+                \_ ->
+                    format
+                        |> Numbers.maxIntDigits 2
+                        |> Numbers.int 1997
+                        |> expectFormat "97"
+            , test "supports numbers with less than the max" <|
+                \_ ->
+                    format
+                        |> Numbers.maxIntDigits 2
+                        |> Numbers.int 7
+                        |> expectFormat "7"
+            ]
         , describe "integer grouping"
             [ test "does not group if length < group size" <|
                 \_ ->
